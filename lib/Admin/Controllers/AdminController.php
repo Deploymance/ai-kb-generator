@@ -479,7 +479,7 @@ HTML;
                     ->update([
                         'status' => 'converted',
                         'kb_article_id' => $articleId,
-                        'updated_at' => now(),
+                        'updated_at' => date('Y-m-d H:i:s'),
                     ]);
             }
 
@@ -509,7 +509,7 @@ HTML;
             ->where('id', $queueId)
             ->update([
                 'status' => 'dismissed',
-                'updated_at' => now(),
+                'updated_at' => date('Y-m-d H:i:s'),
             ]);
         logActivity('[AI KB Generator] Dismissed queue entry #' . $queueId);
     }

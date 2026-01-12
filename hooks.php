@@ -379,14 +379,15 @@ add_hook('TicketClose', 1, function($vars) {
             ->value('name');
         
         // Add to queue
+        $now = date('Y-m-d H:i:s');
         Capsule::table('mod_ai_kb_queue')->insert([
             'ticket_id' => $ticketId,
             'ticket_subject' => $ticket->title,
             'ticket_department' => $department,
             'status' => 'pending',
-            'ticket_closed_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'ticket_closed_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
         
         logActivity('[AI KB Generator] Ticket #' . $ticketId . ' added to KB queue');

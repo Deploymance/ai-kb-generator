@@ -51,10 +51,11 @@ add_hook('AdminAreaHeadOutput', 1, function($vars) {
     
     $categoriesJson = json_encode($kbCategories);
     
-    // Get existing KB articles for "replace" feature
-    $kbArticles = Capsule::table('tblknowledgebase')
-        ->select('id', 'title', 'categoryid')
-        ->orderBy('title')
+    // Get existing KB articles for "replace" feature (with category from links table)
+    $kbArticles = Capsule::table('tblknowledgebase as kb')
+        ->leftJoin('tblknowledgebaselinks as kbl', 'kb.id', '=', 'kbl.articleid')
+        ->select('kb.id', 'kb.title', 'kbl.categoryid')
+        ->orderBy('kb.title')
         ->get()
         ->toArray();
     

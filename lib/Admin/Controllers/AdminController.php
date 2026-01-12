@@ -52,10 +52,11 @@ class AdminController
         
         $categoriesJson = json_encode($kbCategories->toArray());
         
-        // Get KB articles for replace feature
-        $kbArticles = Capsule::table('tblknowledgebase')
-            ->select('id', 'title', 'categoryid')
-            ->orderBy('title')
+        // Get KB articles for replace feature (with category from links table)
+        $kbArticles = Capsule::table('tblknowledgebase as kb')
+            ->leftJoin('tblknowledgebaselinks as kbl', 'kb.id', '=', 'kbl.articleid')
+            ->select('kb.id', 'kb.title', 'kbl.categoryid')
+            ->orderBy('kb.title')
             ->get();
         
         $articlesJson = json_encode($kbArticles->toArray());
@@ -417,23 +418,38 @@ HTML;
                     ->update([
                         'title' => $title,
                         'article' => $content,
-                        'categoryid' => $categoryId,
-                        'published' => $published ? 'yes' : 'no',
+                        'private' => $published ? 0 : 1,  // 0 = public, 1 = private
                     ]);
                 $articleId = $replaceId;
+                
+                // Update category link
+                Capsule::table('tblknowledgebaselinks')
+                    ->where('articleid', $articleId)
+                    ->delete();
+                Capsule::table('tblknowledgebaselinks')->insert([
+                    'categoryid' => $categoryId,
+                    'articleid' => $articleId,
+                ]);
+                
                 logActivity('[AI KB Generator] Updated KB article #' . $articleId);
             } else {
                 // Create new article
                 $articleId = Capsule::table('tblknowledgebase')->insertGetId([
-                    'categoryid' => $categoryId,
                     'title' => $title,
                     'article' => $content,
                     'views' => 0,
                     'useful' => 0,
                     'votes' => 0,
-                    'published' => $published ? 'yes' : 'no',
+                    'private' => $published ? 0 : 1,  // 0 = public, 1 = private
                     'order' => 0,
                 ]);
+                
+                // Create category link
+                Capsule::table('tblknowledgebaselinks')->insert([
+                    'categoryid' => $categoryId,
+                    'articleid' => $articleId,
+                ]);
+                
                 logActivity('[AI KB Generator] Created KB article #' . $articleId);
             }
 

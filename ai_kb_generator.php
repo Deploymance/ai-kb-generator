@@ -19,7 +19,7 @@ function ai_kb_generator_config(): array
         'description' => 'Generate Knowledge Base articles from support tickets using AI. Automatically suggests titles, categories, and tags.',
         'author' => 'Deploymance',
         'language' => 'english',
-        'version' => '1.0.0',
+        'version' => '1.1.0',
         'fields' => [
             'license_key' => [
                 'FriendlyName' => 'License Key',

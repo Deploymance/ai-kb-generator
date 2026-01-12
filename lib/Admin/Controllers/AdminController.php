@@ -491,37 +491,51 @@ HTML;
             }
 
             $articleId = null;
+            
+            // Ensure content is not double-escaped
+            $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
             if ($replaceId > 0) {
-                // Update existing article using WHMCS API
-                $result = localAPI('UpdateKnowledgebaseArticle', [
-                    'articleid' => $replaceId,
+                // Update existing article
+                Capsule::table('tblknowledgebase')
+                    ->where('id', $replaceId)
+                    ->update([
+                        'title' => $title,
+                        'article' => $content,
+                        'private' => $published ? 0 : 1,
+                    ]);
+                $articleId = $replaceId;
+                
+                // Update category link
+                Capsule::table('tblknowledgebaselinks')
+                    ->where('articleid', $articleId)
+                    ->delete();
+                Capsule::table('tblknowledgebaselinks')->insert([
                     'categoryid' => $categoryId,
-                    'title' => $title,
-                    'article' => $content,
-                    'published' => $published ? 'on' : '',
+                    'articleid' => $articleId,
                 ]);
                 
-                if ($result['result'] !== 'success') {
-                    throw new Exception($result['message'] ?? 'Failed to update article');
-                }
-                
-                $articleId = $replaceId;
                 logActivity('[AI KB Generator] Updated KB article #' . $articleId);
             } else {
-                // Create new article using WHMCS API
-                $result = localAPI('AddKnowledgebaseArticle', [
-                    'categoryid' => $categoryId,
+                // Create new article
+                $articleId = Capsule::table('tblknowledgebase')->insertGetId([
                     'title' => $title,
                     'article' => $content,
-                    'published' => $published ? 'on' : '',
+                    'views' => 0,
+                    'useful' => 0,
+                    'votes' => 0,
+                    'private' => $published ? 0 : 1,
+                    'order' => 0,
+                    'parentid' => 0,
+                    'language' => '',
                 ]);
                 
-                if ($result['result'] !== 'success') {
-                    throw new Exception($result['message'] ?? 'Failed to create article');
-                }
+                // Create category link
+                Capsule::table('tblknowledgebaselinks')->insert([
+                    'categoryid' => $categoryId,
+                    'articleid' => $articleId,
+                ]);
                 
-                $articleId = $result['articleid'];
                 logActivity('[AI KB Generator] Created KB article #' . $articleId);
             }
 

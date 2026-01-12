@@ -238,8 +238,25 @@ jQuery(document).ready(function(\$) {
     \$('#queueKbCategory').html(buildCategoryOptions());
     \$('#queueKbReplace').html(buildArticleOptions());
     
+    // Initialize Select2 on modal show
+    \$('#kbQueueModal').on('shown.bs.modal', function() {
+        \$('#queueKbCategory').select2({
+            dropdownParent: \$('#kbQueueModal'),
+            placeholder: '-- Select Category --',
+            allowClear: true,
+            width: '100%'
+        });
+        \$('#queueKbReplace').select2({
+            dropdownParent: \$('#kbQueueModal'),
+            placeholder: '-- Create New Article --',
+            allowClear: true,
+            width: '100%'
+        });
+    });
+    
     \$('#queueKbCategory').on('change', function() {
         \$('#queueKbReplace').html(buildArticleOptions(\$(this).val()));
+        \$('#queueKbReplace').trigger('change.select2');
     });
     
     // Generate KB from queue
@@ -267,9 +284,10 @@ jQuery(document).ready(function(\$) {
                     \$('#queueKbTags').val(response.tags);
                     
                     if (response.suggested_category_id) {
-                        \$('#queueKbCategory').val(response.suggested_category_id);
+                        \$('#queueKbCategory').val(response.suggested_category_id).trigger('change.select2');
                         \$('#queueKbCategorySuggestion').text('(AI suggested)');
                         \$('#queueKbReplace').html(buildArticleOptions(response.suggested_category_id));
+                        \$('#queueKbReplace').trigger('change.select2');
                     }
                     
                     \$('#queueKbLoading').hide();

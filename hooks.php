@@ -182,9 +182,27 @@ jQuery(document).ready(function(\$) {
             '</div>';
         \$('body').append(modalHtml);
         
+        // Initialize Select2 on modal show
+        \$('#aiKbModal').on('shown.bs.modal', function() {
+            \$('#kbCategory').select2({
+                dropdownParent: \$('#aiKbModal'),
+                placeholder: '-- Select Category --',
+                allowClear: true,
+                width: '100%'
+            });
+            \$('#kbReplaceArticle').select2({
+                dropdownParent: \$('#aiKbModal'),
+                placeholder: '-- Create New Article --',
+                allowClear: true,
+                width: '100%'
+            });
+        });
+        
         // Update article dropdown when category changes
         \$(document).on('change', '#kbCategory', function() {
             \$('#kbReplaceArticle').html(buildArticleOptions(\$(this).val()));
+            // Refresh Select2
+            \$('#kbReplaceArticle').trigger('change.select2');
         });
     }
     
@@ -227,9 +245,10 @@ jQuery(document).ready(function(\$) {
                     \$('#kbTags').val(response.tags);
                     
                     if (response.suggested_category_id) {
-                        \$('#kbCategory').val(response.suggested_category_id);
+                        \$('#kbCategory').val(response.suggested_category_id).trigger('change.select2');
                         \$('#kbCategorySuggestion').text('(AI suggested)');
                         \$('#kbReplaceArticle').html(buildArticleOptions(response.suggested_category_id));
+                        \$('#kbReplaceArticle').trigger('change.select2');
                     }
                     
                     \$('#kbGeneratorLoading').hide();

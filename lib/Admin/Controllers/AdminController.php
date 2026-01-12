@@ -558,10 +558,20 @@ HTML;
                 }
             }
 
-            // Update queue entry if from queue
+            // Update queue entry - either by queue ID or by ticket ID
             if ($queueId > 0) {
                 Capsule::table('mod_ai_kb_queue')
                     ->where('id', $queueId)
+                    ->update([
+                        'status' => 'converted',
+                        'kb_article_id' => $articleId,
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+            } elseif ($ticketId > 0) {
+                // Also update if ticket exists in queue (created from in-ticket button)
+                Capsule::table('mod_ai_kb_queue')
+                    ->where('ticket_id', $ticketId)
+                    ->where('status', 'pending')
                     ->update([
                         'status' => 'converted',
                         'kb_article_id' => $articleId,

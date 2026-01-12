@@ -146,8 +146,18 @@ jQuery(document).ready(function(\$) {
             '<div class="row">' +
             '<div class="col-md-6">' +
             '<div class="form-group">' +
-            '<label><strong>Category:</strong> <span id="kbCategorySuggestion" class="text-muted small"></span></label>' +
+            '<label><strong>Category:</strong> <span id="kbCategorySuggestion" class="text-muted small"></span> ' +
+            '<a href="#" id="kbNewCategoryToggle" class="small"><i class="fa fa-plus"></i> New</a></label>' +
             '<select class="form-control" id="kbCategory">' + buildCategoryOptions() + '</select>' +
+            '<div id="kbNewCategoryForm" style="display:none;margin-top:10px;padding:10px;background:#f9f9f9;border-radius:4px;">' +
+            '<input type="text" class="form-control input-sm" id="kbNewCategoryName" placeholder="New category name...">' +
+            '<select class="form-control input-sm" id="kbNewCategoryParent" style="margin-top:5px;">' +
+            '<option value="0">-- No Parent (Top Level) --</option>' + buildCategoryOptions() + '</select>' +
+            '<button type="button" class="btn btn-sm btn-success" id="kbCreateCategoryBtn" style="margin-top:5px;">' +
+            '<i class="fa fa-check"></i> Create</button> ' +
+            '<button type="button" class="btn btn-sm btn-default" id="kbCancelCategoryBtn" style="margin-top:5px;">' +
+            'Cancel</button>' +
+            '</div>' +
             '</div>' +
             '</div>' +
             '<div class="col-md-6">' +
@@ -203,6 +213,62 @@ jQuery(document).ready(function(\$) {
             \$('#kbReplaceArticle').html(buildArticleOptions(\$(this).val()));
             // Refresh Select2
             \$('#kbReplaceArticle').trigger('change.select2');
+        });
+        
+        // Toggle new category form
+        \$(document).on('click', '#kbNewCategoryToggle', function(e) {
+            e.preventDefault();
+            \$('#kbNewCategoryForm').slideToggle();
+            \$('#kbNewCategoryName').val('').focus();
+        });
+        
+        \$(document).on('click', '#kbCancelCategoryBtn', function() {
+            \$('#kbNewCategoryForm').slideUp();
+            \$('#kbNewCategoryName').val('');
+        });
+        
+        // Create new category
+        \$(document).on('click', '#kbCreateCategoryBtn', function() {
+            var btn = \$(this);
+            var name = \$('#kbNewCategoryName').val().trim();
+            var parentId = \$('#kbNewCategoryParent').val() || 0;
+            
+            if (!name) {
+                alert('Please enter a category name.');
+                \$('#kbNewCategoryName').focus();
+                return;
+            }
+            
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+            
+            \$.ajax({
+                url: '{$moduleLink}&action=create_category',
+                method: 'POST',
+                data: { name: name, parent_id: parentId },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        // Add new category to arrays and dropdowns
+                        var newCat = { id: response.category_id, name: name, parentid: parseInt(parentId) };
+                        kbCategories.push(newCat);
+                        
+                        // Rebuild and refresh dropdowns
+                        \$('#kbCategory').html(buildCategoryOptions(response.category_id));
+                        \$('#kbCategory').val(response.category_id).trigger('change.select2');
+                        \$('#kbNewCategoryParent').html('<option value="0">-- No Parent (Top Level) --</option>' + buildCategoryOptions());
+                        
+                        \$('#kbNewCategoryForm').slideUp();
+                        \$('#kbNewCategoryName').val('');
+                    } else {
+                        alert('Error: ' + (response.message || 'Failed to create category'));
+                    }
+                    btn.prop('disabled', false).html('<i class="fa fa-check"></i> Create');
+                },
+                error: function() {
+                    alert('Failed to create category.');
+                    btn.prop('disabled', false).html('<i class="fa fa-check"></i> Create');
+                }
+            });
         });
     }
     
@@ -438,5 +504,44 @@ add_hook('AdminAreaPage', 1, function($vars) {
         } elseif ($action === 'save_kb') {
             $controller->saveKB();
         }
+    }
+    
+    // Handle create category AJAX request
+    if ($action === 'create_category') {
+        ob_clean();
+        header('Content-Type: application/json');
+        
+        try {
+            $name = trim($_POST['name'] ?? '');
+            $parentId = (int) ($_POST['parent_id'] ?? 0);
+            
+            if (empty($name)) {
+                throw new Exception('Category name is required');
+            }
+            
+            // Create the category
+            $categoryId = Capsule::table('tblknowledgebasecats')->insertGetId([
+                'name' => $name,
+                'description' => '',
+                'parentid' => $parentId,
+                'hidden' => 0,
+            ]);
+            
+            logActivity('[AI KB Generator] Created KB category: ' . $name . ' (ID: ' . $categoryId . ')');
+            
+            echo json_encode([
+                'success' => true,
+                'category_id' => $categoryId,
+                'message' => 'Category created successfully',
+            ]);
+        } catch (Exception $e) {
+            logActivity('[AI KB Generator] Error creating category: ' . $e->getMessage());
+            echo json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+        
+        exit;
     }
 });

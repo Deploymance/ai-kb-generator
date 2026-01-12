@@ -173,8 +173,16 @@ ROW;
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label><strong>Category:</strong> <span id="queueKbCategorySuggestion" class="text-muted small"></span></label>
+                                <label><strong>Category:</strong> <span id="queueKbCategorySuggestion" class="text-muted small"></span>
+                                <a href="#" id="queueNewCategoryToggle" class="small"><i class="fa fa-plus"></i> New</a></label>
                                 <select class="form-control" id="queueKbCategory"></select>
+                                <div id="queueNewCategoryForm" style="display:none;margin-top:10px;padding:10px;background:#f9f9f9;border-radius:4px;">
+                                    <input type="text" class="form-control input-sm" id="queueNewCategoryName" placeholder="New category name...">
+                                    <select class="form-control input-sm" id="queueNewCategoryParent" style="margin-top:5px;"></select>
+                                    <button type="button" class="btn btn-sm btn-success" id="queueCreateCategoryBtn" style="margin-top:5px;">
+                                    <i class="fa fa-check"></i> Create</button>
+                                    <button type="button" class="btn btn-sm btn-default" id="queueCancelCategoryBtn" style="margin-top:5px;">Cancel</button>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -237,6 +245,7 @@ jQuery(document).ready(function(\$) {
     
     \$('#queueKbCategory').html(buildCategoryOptions());
     \$('#queueKbReplace').html(buildArticleOptions());
+    \$('#queueNewCategoryParent').html('<option value="0">-- No Parent (Top Level) --</option>' + buildCategoryOptions());
     
     // Initialize Select2 on modal show
     \$('#kbQueueModal').on('shown.bs.modal', function() {
@@ -257,6 +266,60 @@ jQuery(document).ready(function(\$) {
     \$('#queueKbCategory').on('change', function() {
         \$('#queueKbReplace').html(buildArticleOptions(\$(this).val()));
         \$('#queueKbReplace').trigger('change.select2');
+    });
+    
+    // Toggle new category form
+    \$('#queueNewCategoryToggle').on('click', function(e) {
+        e.preventDefault();
+        \$('#queueNewCategoryForm').slideToggle();
+        \$('#queueNewCategoryName').val('').focus();
+    });
+    
+    \$('#queueCancelCategoryBtn').on('click', function() {
+        \$('#queueNewCategoryForm').slideUp();
+        \$('#queueNewCategoryName').val('');
+    });
+    
+    // Create new category from queue modal
+    \$('#queueCreateCategoryBtn').on('click', function() {
+        var btn = \$(this);
+        var name = \$('#queueNewCategoryName').val().trim();
+        var parentId = \$('#queueNewCategoryParent').val() || 0;
+        
+        if (!name) {
+            alert('Please enter a category name.');
+            \$('#queueNewCategoryName').focus();
+            return;
+        }
+        
+        btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+        
+        \$.ajax({
+            url: moduleLink + '&action=create_category',
+            method: 'POST',
+            data: { name: name, parent_id: parentId },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    var newCat = { id: response.category_id, name: name, parentid: parseInt(parentId) };
+                    kbCategories.push(newCat);
+                    
+                    \$('#queueKbCategory').html(buildCategoryOptions(response.category_id));
+                    \$('#queueKbCategory').val(response.category_id).trigger('change.select2');
+                    \$('#queueNewCategoryParent').html('<option value="0">-- No Parent (Top Level) --</option>' + buildCategoryOptions());
+                    
+                    \$('#queueNewCategoryForm').slideUp();
+                    \$('#queueNewCategoryName').val('');
+                } else {
+                    alert('Error: ' + (response.message || 'Failed to create category'));
+                }
+                btn.prop('disabled', false).html('<i class="fa fa-check"></i> Create');
+            },
+            error: function() {
+                alert('Failed to create category.');
+                btn.prop('disabled', false).html('<i class="fa fa-check"></i> Create');
+            }
+        });
     });
     
     // Generate KB from queue

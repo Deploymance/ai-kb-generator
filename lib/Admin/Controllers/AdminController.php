@@ -493,44 +493,35 @@ HTML;
             $articleId = null;
 
             if ($replaceId > 0) {
-                // Update existing article
-                Capsule::table('tblknowledgebase')
-                    ->where('id', $replaceId)
-                    ->update([
-                        'title' => $title,
-                        'article' => $content,
-                        'private' => $published ? 0 : 1,  // 0 = public, 1 = private
-                    ]);
-                $articleId = $replaceId;
-                
-                // Update category link
-                Capsule::table('tblknowledgebaselinks')
-                    ->where('articleid', $articleId)
-                    ->delete();
-                Capsule::table('tblknowledgebaselinks')->insert([
+                // Update existing article using WHMCS API
+                $result = localAPI('UpdateKnowledgebaseArticle', [
+                    'articleid' => $replaceId,
                     'categoryid' => $categoryId,
-                    'articleid' => $articleId,
-                ]);
-                
-                logActivity('[AI KB Generator] Updated KB article #' . $articleId);
-            } else {
-                // Create new article
-                $articleId = Capsule::table('tblknowledgebase')->insertGetId([
                     'title' => $title,
                     'article' => $content,
-                    'views' => 0,
-                    'useful' => 0,
-                    'votes' => 0,
-                    'private' => $published ? 0 : 1,  // 0 = public, 1 = private
-                    'order' => 0,
+                    'published' => $published ? 'on' : '',
                 ]);
                 
-                // Create category link
-                Capsule::table('tblknowledgebaselinks')->insert([
+                if ($result['result'] !== 'success') {
+                    throw new Exception($result['message'] ?? 'Failed to update article');
+                }
+                
+                $articleId = $replaceId;
+                logActivity('[AI KB Generator] Updated KB article #' . $articleId);
+            } else {
+                // Create new article using WHMCS API
+                $result = localAPI('AddKnowledgebaseArticle', [
                     'categoryid' => $categoryId,
-                    'articleid' => $articleId,
+                    'title' => $title,
+                    'article' => $content,
+                    'published' => $published ? 'on' : '',
                 ]);
                 
+                if ($result['result'] !== 'success') {
+                    throw new Exception($result['message'] ?? 'Failed to create article');
+                }
+                
+                $articleId = $result['articleid'];
                 logActivity('[AI KB Generator] Created KB article #' . $articleId);
             }
 

@@ -31,11 +31,26 @@ class AdminController
             $this->deleteFromQueue((int) $_POST['delete_id']);
         }
         
-        // Get queue entries
-        $queueEntries = Capsule::table('mod_ai_kb_queue')
-            ->orderBy('created_at', 'desc')
-            ->limit(100)
-            ->get();
+        // Get filter and sort params
+        $filterStatus = $_GET['filter'] ?? 'all';
+        $sortBy = $_GET['sort'] ?? 'created_at';
+        $sortDir = $_GET['dir'] ?? 'desc';
+        
+        // Validate sort column
+        $allowedSorts = ['ticket_id', 'ticket_subject', 'ticket_department', 'status', 'ticket_closed_at', 'created_at'];
+        if (!in_array($sortBy, $allowedSorts)) {
+            $sortBy = 'created_at';
+        }
+        $sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+        
+        // Build query with filters
+        $query = Capsule::table('mod_ai_kb_queue');
+        
+        if ($filterStatus !== 'all' && in_array($filterStatus, ['pending', 'converted', 'dismissed'])) {
+            $query->where('status', $filterStatus);
+        }
+        
+        $queueEntries = $query->orderBy($sortBy, $sortDir)->limit(100)->get();
         
         // Get stats
         $stats = [
@@ -43,6 +58,7 @@ class AdminController
             'converted' => Capsule::table('mod_ai_kb_queue')->where('status', 'converted')->count(),
             'dismissed' => Capsule::table('mod_ai_kb_queue')->where('status', 'dismissed')->count(),
         ];
+        $stats['all'] = $stats['pending'] + $stats['converted'] + $stats['dismissed'];
         
         // Get KB categories for modal
         $kbCategories = Capsule::table('tblknowledgebasecats')
@@ -61,32 +77,73 @@ class AdminController
         
         $articlesJson = json_encode($kbArticles->toArray());
         
+        // Build sort link helper
+        $buildSortLink = function($column, $label) use ($moduleLink, $filterStatus, $sortBy, $sortDir) {
+            $newDir = ($sortBy === $column && $sortDir === 'desc') ? 'asc' : 'desc';
+            $icon = '';
+            if ($sortBy === $column) {
+                $icon = $sortDir === 'asc' ? ' <i class="fa fa-sort-asc"></i>' : ' <i class="fa fa-sort-desc"></i>';
+            }
+            return '<a href="' . $moduleLink . '&filter=' . $filterStatus . '&sort=' . $column . '&dir=' . $newDir . '">' . $label . $icon . '</a>';
+        };
+        
+        // Filter active classes
+        $filterAll = $filterStatus === 'all' ? 'btn-primary' : 'btn-default';
+        $filterPending = $filterStatus === 'pending' ? 'btn-warning' : 'btn-default';
+        $filterConverted = $filterStatus === 'converted' ? 'btn-success' : 'btn-default';
+        $filterDismissed = $filterStatus === 'dismissed' ? 'btn-default active' : 'btn-default';
+        
+        $sortTicket = $buildSortLink('ticket_id', 'Ticket #');
+        $sortSubject = $buildSortLink('ticket_subject', 'Subject');
+        $sortDept = $buildSortLink('ticket_department', 'Department');
+        $sortStatus = $buildSortLink('status', 'Status');
+        $sortClosed = $buildSortLink('ticket_closed_at', 'Closed');
+        $sortCreated = $buildSortLink('created_at', 'Added');
+        
         echo <<<HTML
 <style>
 .kb-stats { display: flex; gap: 20px; margin-bottom: 20px; }
-.kb-stat { background: #f8f9fa; padding: 15px 25px; border-radius: 8px; text-align: center; }
+.kb-stat { background: #f8f9fa; padding: 15px 25px; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.kb-stat:hover { background: #e9ecef; }
+.kb-stat.active { border: 2px solid #007bff; }
 .kb-stat .number { font-size: 2em; font-weight: bold; }
 .kb-stat .label { color: #666; }
 .queue-table { margin-top: 20px; }
+.queue-table th a { color: #333; text-decoration: none; }
+.queue-table th a:hover { color: #007bff; }
 .status-pending { color: #f0ad4e; }
 .status-converted { color: #5cb85c; }
 .status-dismissed { color: #999; }
+.filter-bar { margin-bottom: 15px; }
 </style>
 
 <h2><i class="fa fa-book"></i> AI KB Generator - Ticket Queue</h2>
 
 <div class="kb-stats">
-    <div class="kb-stat">
+    <a href="{$moduleLink}&filter=all" class="kb-stat" style="text-decoration:none;">
+        <div class="number">{$stats['all']}</div>
+        <div class="label">All Tickets</div>
+    </a>
+    <a href="{$moduleLink}&filter=pending" class="kb-stat" style="text-decoration:none;">
         <div class="number text-warning">{$stats['pending']}</div>
         <div class="label">Pending Review</div>
-    </div>
-    <div class="kb-stat">
+    </a>
+    <a href="{$moduleLink}&filter=converted" class="kb-stat" style="text-decoration:none;">
         <div class="number text-success">{$stats['converted']}</div>
         <div class="label">Converted to KB</div>
-    </div>
-    <div class="kb-stat">
+    </a>
+    <a href="{$moduleLink}&filter=dismissed" class="kb-stat" style="text-decoration:none;">
         <div class="number text-muted">{$stats['dismissed']}</div>
         <div class="label">Dismissed</div>
+    </a>
+</div>
+
+<div class="filter-bar">
+    <div class="btn-group">
+        <a href="{$moduleLink}&filter=all" class="btn {$filterAll}">All ({$stats['all']})</a>
+        <a href="{$moduleLink}&filter=pending" class="btn {$filterPending}">Pending ({$stats['pending']})</a>
+        <a href="{$moduleLink}&filter=converted" class="btn {$filterConverted}">Converted ({$stats['converted']})</a>
+        <a href="{$moduleLink}&filter=dismissed" class="btn {$filterDismissed}">Dismissed ({$stats['dismissed']})</a>
     </div>
 </div>
 
@@ -99,11 +156,12 @@ class AdminController
 <table class="table table-striped queue-table">
     <thead>
         <tr>
-            <th>Ticket #</th>
-            <th>Subject</th>
-            <th>Department</th>
-            <th>Status</th>
-            <th>Closed</th>
+            <th>{$sortTicket}</th>
+            <th>{$sortSubject}</th>
+            <th>{$sortDept}</th>
+            <th>{$sortStatus}</th>
+            <th>{$sortClosed}</th>
+            <th>{$sortCreated}</th>
             <th>Actions</th>
         </tr>
     </thead>
@@ -114,6 +172,7 @@ HTML;
             $statusClass = 'status-' . $entry->status;
             $statusLabel = ucfirst($entry->status);
             $closedAt = $entry->ticket_closed_at ? date('M j, Y', strtotime($entry->ticket_closed_at)) : '-';
+            $createdAt = $entry->created_at ? date('M j, Y', strtotime($entry->created_at)) : '-';
             
             $actionsHtml = '';
             if ($entry->status === 'pending') {
@@ -139,13 +198,14 @@ ACTIONS;
             <td>{$entry->ticket_department}</td>
             <td><span class="{$statusClass}">{$statusLabel}</span></td>
             <td>{$closedAt}</td>
+            <td>{$createdAt}</td>
             <td>{$actionsHtml}</td>
         </tr>
 ROW;
         }
 
         if ($queueEntries->isEmpty()) {
-            echo '<tr><td colspan="6" class="text-center text-muted">No tickets in queue</td></tr>';
+            echo '<tr><td colspan="7" class="text-center text-muted">No tickets in queue</td></tr>';
         }
 
         echo <<<HTML

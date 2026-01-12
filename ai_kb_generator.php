@@ -178,7 +178,7 @@ function ai_kb_generator_sidebar($vars): string
     $sidebar .= '<h4>Quick Links</h4>';
     $sidebar .= '<ul>';
     $sidebar .= '<li><a href="supportkb.php">Manage Knowledge Base</a></li>';
-    $sidebar .= '<li><a href="https://ai.google.dev/gemini-api/docs" target="_blank">Gemini API Docs</a></li>';
+    $sidebar .= '<li><a href="https://deploymance.com/addons" target="_blank">Deploymance Addons</a></li>';
     $sidebar .= '</ul>';
     $sidebar .= '</div></div>';
     
